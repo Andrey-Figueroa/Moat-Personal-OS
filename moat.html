@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MOAT</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Geist:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0a0a;
+    --surface:  #111111;
+    --border:   #1f1f1f;
+    --border2:  #2a2a2a;
+    --text:     #e8e8e8;
+    --muted:    #555555;
+    --dim:      #333333;
+    --accent:   #e8e8e8;
+    --white:    #ffffff;
+    --nav-w:    260px;
+    --ease:     cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Geist', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── LOCK SCREEN ──────────────────────────────────────────── */
+  #lock {
+    position: fixed; inset: 0; z-index: 1000;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0;
+    transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+  }
+
+  #lock.unlocking {
+    opacity: 0;
+    transform: translateY(-24px);
+    pointer-events: none;
+  }
+
+  .lock-wordmark {
+    font-family: 'DM Serif Display', serif;
+    font-size: 4.5rem;
+    letter-spacing: -0.02em;
+    color: var(--white);
+    margin-bottom: 6px;
+    user-select: none;
+  }
+
+  .lock-tagline {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-bottom: 56px;
+  }
+
+  .lock-form {
+    display: flex; flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    width: 280px;
+  }
+
+  .lock-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border2);
+    color: var(--white);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.95rem;
+    letter-spacing: 0.3em;
+    padding: 12px 0;
+    text-align: center;
+    outline: none;
+    transition: border-color 0.3s;
+    caret-color: var(--white);
+  }
+
+  .lock-input:focus { border-color: var(--dim); }
+  .lock-input::placeholder { color: var(--muted); letter-spacing: 0.15em; font-size: 0.75rem; }
+
+  .lock-btn {
+    margin-top: 8px;
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 13px;
+    cursor: pointer;
+    transition: all 0.25s var(--ease);
+    position: relative; overflow: hidden;
+  }
+
+  .lock-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--white);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.3s var(--ease);
+    z-index: 0;
+  }
+
+  .lock-btn:hover::before { transform: scaleX(1); }
+  .lock-btn:hover { color: var(--bg); border-color: var(--white); }
+  .lock-btn span { position: relative; z-index: 1; }
+
+  .lock-error {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: #555;
+    letter-spacing: 0.1em;
+    height: 16px;
+    transition: color 0.3s;
+  }
+  .lock-error.visible { color: #888; }
+
+  /* ─── APP SHELL ────────────────────────────────────────────── */
+  #app {
+    display: flex;
+    min-height: 100vh;
+    opacity: 0;
+    transition: opacity 0.5s var(--ease);
+  }
+  #app.visible { opacity: 1; }
+
+  /* ─── SIDEBAR ──────────────────────────────────────────────── */
+  #nav {
+    width: var(--nav-w);
+    min-height: 100vh;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    position: fixed; top: 0; left: 0; bottom: 0;
+    z-index: 100;
+  }
+
+  .nav-logo {
+    padding: 32px 28px 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .nav-logo-word {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.6rem;
+    color: var(--white);
+    letter-spacing: -0.01em;
+    display: block;
+  }
+
+  .nav-logo-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    display: block;
+    margin-top: 3px;
+  }
+
+  .nav-section {
+    padding: 20px 0 8px;
+  }
+
+  .nav-section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--dim);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    padding: 0 28px;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .nav-item {
+    display: flex; align-items: center;
+    gap: 11px;
+    padding: 10px 28px;
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 300;
+    letter-spacing: 0.01em;
+    transition: all 0.2s var(--ease);
+    position: relative;
+    user-select: none;
+    border: none; background: none; width: 100%; text-align: left;
+  }
+
+  .nav-item::before {
+    content: '';
+    position: absolute; left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 2px; height: 0;
+    background: var(--white);
+    transition: height 0.25s var(--ease);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .nav-item:hover { color: var(--text); background: rgba(255,255,255,0.02); }
+  .nav-item:hover::before { height: 60%; }
+
+  .nav-item.active { color: var(--white); }
+  .nav-item.active::before { height: 70%; }
+
+  .nav-item-icon {
+    width: 14px; height: 14px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+    flex-shrink: 0;
+  }
+  .nav-item:hover .nav-item-icon,
+  .nav-item.active .nav-item-icon { opacity: 1; }
+
+  .nav-sub {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.35s var(--ease);
+  }
+  .nav-sub.open { max-height: 200px; }
+
+  .nav-sub-item {
+    display: flex; align-items: center;
+    gap: 11px;
+    padding: 8px 28px 8px 44px;
+    cursor: pointer;
+    color: var(--dim);
+    font-size: 0.78rem;
+    transition: all 0.2s;
+    border: none; background: none; width: 100%; text-align: left;
+    user-select: none;
+  }
+  .nav-sub-item:hover { color: var(--muted); }
+  .nav-sub-item.active { color: var(--text); }
+
+  .nav-dot {
+    width: 4px; height: 4px;
+    background: var(--dim);
+    border-radius: 50%;
+    flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .nav-sub-item:hover .nav-dot { background: var(--muted); }
+  .nav-sub-item.active .nav-dot { background: var(--white); }
+
+  .nav-chevron {
+    margin-left: auto;
+    width: 10px; height: 10px;
+    transition: transform 0.3s var(--ease);
+    opacity: 0.35;
+  }
+  .nav-item.open .nav-chevron { transform: rotate(90deg); }
+
+  .nav-bottom {
+    margin-top: auto;
+    padding: 20px 28px;
+    border-top: 1px solid var(--border);
+  }
+
+  /* Clock */
+  .nav-clock {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--dim);
+    letter-spacing: 0.05em;
+    line-height: 1.8;
+  }
+  .nav-clock-time {
+    font-size: 1.05rem;
+    color: var(--muted);
+    display: block;
+    letter-spacing: 0.08em;
+  }
+  .nav-clock-date {
+    font-size: 0.62rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+  }
+
+  /* Lock button */
+  .nav-lock-btn {
+    margin-top: 14px;
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 9px;
+    cursor: pointer;
+    transition: all 0.25s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .nav-lock-btn:hover { color: var(--muted); border-color: var(--dim); }
+
+  /* ─── MAIN CONTENT ─────────────────────────────────────────── */
+  #main {
+    margin-left: var(--nav-w);
+    flex: 1;
+    min-height: 100vh;
+  }
+
+  .page {
+    display: none;
+    padding: 52px 56px;
+    animation: fadeUp 0.4s var(--ease) both;
+  }
+  .page.active { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .page-header {
+    margin-bottom: 48px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .page-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--dim);
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .page-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.6rem;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .page-desc {
+    margin-top: 12px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    font-weight: 300;
+    letter-spacing: 0.01em;
+  }
+
+  /* ─── DASHBOARD GRID ───────────────────────────────────────── */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .dash-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 24px;
+    cursor: pointer;
+    transition: border-color 0.25s var(--ease), transform 0.25s var(--ease);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dash-card::after {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: var(--white);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.35s var(--ease);
+  }
+
+  .dash-card:hover { border-color: var(--dim); transform: translateY(-2px); }
+  .dash-card:hover::after { transform: scaleX(1); }
+
+  .dash-card-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    color: var(--dim);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .dash-card-label::before {
+    content: '';
+    width: 16px; height: 1px;
+    background: var(--dim);
+  }
+
+  .dash-card-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    color: var(--white);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .dash-card-sub {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-weight: 300;
+  }
+
+  .dash-card-wide {
+    grid-column: span 2;
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    min-height: 320px;
+    gap: 12px;
+    color: var(--dim);
+  }
+
+  .empty-line {
+    width: 32px; height: 1px;
+    background: var(--dim);
+  }
+
+  .empty-text {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  /* ─── SECTION CARDS ────────────────────────────────────────── */
+  .section-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+    max-width: 640px;
+  }
+
+  .section-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 28px;
+  }
+
+  .block-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--dim);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .placeholder-rows {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .placeholder-row {
+    height: 1px;
+    background: var(--border);
+  }
+
+  .placeholder-row:nth-child(2) { width: 80%; }
+  .placeholder-row:nth-child(3) { width: 65%; }
+  .placeholder-row:nth-child(4) { width: 75%; }
+
+  .coming-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--dim);
+    letter-spacing: 0.15em;
+    margin-top: 16px;
+  }
+
+  /* ─── TABLE ────────────────────────────────────────────────── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+
+  .data-table th {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.58rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--dim);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  .data-table td {
+    padding: 13px 16px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    font-weight: 300;
+    transition: color 0.2s;
+  }
+
+  .data-table tr:hover td { color: var(--text); }
+  .data-table tr:last-child td { border-bottom: none; }
+
+  /* ─── BTN ──────────────────────────────────────────────────── */
+  .btn {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 11px 22px;
+    cursor: pointer;
+    transition: all 0.25s var(--ease);
+    position: relative; overflow: hidden;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: var(--white);
+    transform: scaleX(0); transform-origin: left;
+    transition: transform 0.3s var(--ease);
+    z-index: 0;
+  }
+
+  .btn:hover::before { transform: scaleX(1); }
+  .btn:hover { color: var(--bg); border-color: var(--white); }
+  .btn span { position: relative; z-index: 1; }
+
+  .btn-sm {
+    padding: 8px 16px;
+    font-size: 0.6rem;
+  }
+
+  /* ─── FORM ─────────────────────────────────────────────────── */
+  .form-group {
+    margin-bottom: 24px;
+  }
+
+  .form-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--dim);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 8px;
+  }
+
+  .form-input {
+    width: 100%;
+    max-width: 360px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'Geist', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 300;
+    padding: 10px 0;
+    outline: none;
+    transition: border-color 0.25s;
+  }
+
+  .form-input:focus { border-color: var(--muted); }
+
+  .form-select {
+    width: 100%;
+    max-width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    padding: 10px 14px;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+  }
+
+</style>
+</head>
+<body>
+
+<!-- ─── LOCK SCREEN ──────────────────────────────────────────────── -->
+<div id="lock">
+  <span class="lock-wordmark">Moat</span>
+  <span class="lock-tagline">Personal Operations Center</span>
+
+  <div class="lock-form">
+    <input
+      class="lock-input"
+      id="pwd-input"
+      type="password"
+      placeholder="contraseña"
+      autocomplete="off"
+      onkeydown="if(event.key==='Enter') unlock()"
+    />
+    <button class="lock-btn" onclick="unlock()">
+      <span>Entrar</span>
+    </button>
+    <span class="lock-error" id="lock-err">Contraseña incorrecta</span>
+  </div>
+</div>
+
+<!-- ─── APP ──────────────────────────────────────────────────────── -->
+<div id="app">
+
+  <!-- SIDEBAR -->
+  <nav id="nav">
+    <div class="nav-logo">
+      <span class="nav-logo-word">Moat</span>
+      <span class="nav-logo-sub">Personal OS</span>
+    </div>
+
+    <!-- Nav Items -->
+    <div class="nav-section">
+      <span class="nav-section-label">Principal</span>
+      <button class="nav-item active" onclick="navigate('dashboard', this)">
+        <svg class="nav-item-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="1" y="1" width="5" height="5"/><rect x="8" y="1" width="5" height="5"/>
+          <rect x="1" y="8" width="5" height="5"/><rect x="8" y="8" width="5" height="5"/>
+        </svg>
+        Dashboard
+      </button>
+    </div>
+
+    <div class="nav-section">
+      <span class="nav-section-label">Finanzas</span>
+
+      <!-- Bolsa toggle -->
+      <button class="nav-item" id="nav-bolsa-toggle" onclick="toggleSub('bolsa', this)">
+        <svg class="nav-item-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <polyline points="1,10 4,6 7,8 10,4 13,2"/><polyline points="10,2 13,2 13,5"/>
+        </svg>
+        Bolsa de Valores
+        <svg class="nav-chevron" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.2">
+          <polyline points="3,2 7,5 3,8"/>
+        </svg>
+      </button>
+      <div class="nav-sub" id="sub-bolsa">
+        <button class="nav-sub-item" onclick="navigate('portfolio', this, 'nav-bolsa-toggle')">
+          <span class="nav-dot"></span>Portafolio
+        </button>
+        <button class="nav-sub-item" onclick="navigate('registrar', this, 'nav-bolsa-toggle')">
+          <span class="nav-dot"></span>Registrar Operación
+        </button>
+      </div>
+
+      <button class="nav-item" onclick="navigate('finanzas', this)">
+        <svg class="nav-item-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <circle cx="7" cy="7" r="6"/><path d="M7 4v6M5 5.5h3a1 1 0 010 2H6a1 1 0 000 2h3"/>
+        </svg>
+        Finanzas Personales
+      </button>
+    </div>
+
+    <div class="nav-section">
+      <span class="nav-section-label">Vida</span>
+      <button class="nav-item" onclick="navigate('gym', this)">
+        <svg class="nav-item-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <path d="M1 7h2M11 7h2M3 5v4M11 5v4M5 7h4"/><circle cx="5" cy="7" r="0.5" fill="currentColor"/>
+          <circle cx="9" cy="7" r="0.5" fill="currentColor"/>
+        </svg>
+        Rutina de Gym
+      </button>
+      <button class="nav-item" onclick="navigate('horario', this)">
+        <svg class="nav-item-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="1" y="2" width="12" height="11" rx="0.5"/>
+          <path d="M1 5h12M4 1v3M10 1v3"/>
+        </svg>
+        Horario del TEC
+      </button>
+      <button class="nav-item" onclick="navigate('tasks', this)">
+        <svg class="nav-item-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <polyline points="2,7 5,10 12,3"/><line x1="2" y1="2" x2="12" y2="2"/>
+        </svg>
+        Tasks
+      </button>
+    </div>
+
+    <div class="nav-section">
+      <span class="nav-section-label">Seguridad</span>
+      <button class="nav-item" onclick="navigate('passwords', this)">
+        <svg class="nav-item-icon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="2" y="6" width="10" height="7" rx="0.5"/>
+          <path d="M4 6V4a3 3 0 016 0v2"/>
+          <circle cx="7" cy="10" r="1" fill="currentColor"/>
+        </svg>
+        Contraseñas
+      </button>
+    </div>
+
+    <!-- Bottom: clock + lock -->
+    <div class="nav-bottom">
+      <div class="nav-clock">
+        <span class="nav-clock-time" id="clock-time">00:00:00</span>
+        <span class="nav-clock-date" id="clock-date">—</span>
+      </div>
+      <button class="nav-lock-btn" onclick="lockApp()">
+        <svg width="10" height="10" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.2">
+          <rect x="2" y="6" width="10" height="7" rx="0.5"/>
+          <path d="M4 6V4a3 3 0 016 0v2"/>
+        </svg>
+        Bloquear
+      </button>
+    </div>
+  </nav>
+
+  <!-- MAIN -->
+  <main id="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <span class="page-label">Moat — Personal OS</span>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-desc">Resumen general de tu operación.</p>
+      </div>
+
+      <div class="dash-grid">
+        <div class="dash-card" onclick="navigate('portfolio', null)">
+          <div class="dash-card-label">Portafolio</div>
+          <div class="dash-card-value">—</div>
+          <div class="dash-card-sub">Conectá tu Google Sheets</div>
+        </div>
+        <div class="dash-card" onclick="navigate('tasks', null)">
+          <div class="dash-card-label">Tasks</div>
+          <div class="dash-card-value">0</div>
+          <div class="dash-card-sub">Tareas pendientes</div>
+        </div>
+        <div class="dash-card" onclick="navigate('gym', null)">
+          <div class="dash-card-label">Gym hoy</div>
+          <div class="dash-card-value">—</div>
+          <div class="dash-card-sub">Sin rutina configurada</div>
+        </div>
+        <div class="dash-card dash-card-wide" onclick="navigate('horario', null)">
+          <div class="dash-card-label">Clases de hoy</div>
+          <div class="dash-card-value">—</div>
+          <div class="dash-card-sub">Sin horario configurado</div>
+        </div>
+        <div class="dash-card" onclick="navigate('finanzas', null)">
+          <div class="dash-card-label">Finanzas</div>
+          <div class="dash-card-value">—</div>
+          <div class="dash-card-sub">Sin datos aún</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PORTAFOLIO -->
+    <div class="page" id="page-portfolio">
+      <div class="page-header">
+        <span class="page-label">Bolsa de Valores</span>
+        <h1 class="page-title">Portafolio</h1>
+        <p class="page-desc">Tus posiciones actuales.</p>
+      </div>
+      <div class="empty-state">
+        <div class="empty-line"></div>
+        <span class="empty-text">Sin posiciones registradas</span>
+        <div class="empty-line"></div>
+      </div>
+    </div>
+
+    <!-- REGISTRAR OPERACIÓN -->
+    <div class="page" id="page-registrar">
+      <div class="page-header">
+        <span class="page-label">Bolsa de Valores</span>
+        <h1 class="page-title">Registrar Operación</h1>
+        <p class="page-desc">Los datos viajan a n8n vía webhook en formato JSON.</p>
+      </div>
+
+      <div style="max-width: 400px;">
+        <div class="form-group">
+          <label class="form-label">Ticker</label>
+          <input class="form-input" id="f-ticker" type="text" placeholder="AAPL" style="text-transform:uppercase;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Precio de Compra ($)</label>
+          <input class="form-input" id="f-precio" type="number" step="0.01" placeholder="185.50">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Monto Invertido ($)</label>
+          <input class="form-input" id="f-monto" type="number" step="0.01" placeholder="1000.00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Precio Objetivo ($)</label>
+          <input class="form-input" id="f-objetivo" type="number" step="0.01" placeholder="220.00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Sector</label>
+          <select class="form-select" id="f-sector">
+            <option value="">— Seleccioná —</option>
+            <option>Tecnología</option>
+            <option>Salud</option>
+            <option>Finanzas</option>
+            <option>Energía</option>
+            <option>Consumo</option>
+            <option>Industriales</option>
+            <option>Cripto</option>
+            <option>Otro</option>
+          </select>
+        </div>
+
+        <!-- File upload -->
+        <div class="form-group">
+          <label class="form-label">Comprobante (foto)</label>
+          <div id="drop-zone" onclick="document.getElementById('f-file').click()"
+            style="border:1px dashed var(--border2);padding:24px;text-align:center;cursor:pointer;transition:border-color 0.25s;"
+            ondragover="event.preventDefault();this.style.borderColor='var(--muted)'"
+            ondragleave="this.style.borderColor='var(--border2)'"
+            ondrop="handleDrop(event)">
+            <input type="file" id="f-file" accept="image/*" style="display:none" onchange="handleFile(this.files[0])">
+            <span id="drop-label" style="font-family:'DM Mono',monospace;font-size:0.62rem;color:var(--dim);letter-spacing:0.12em;text-transform:uppercase;">
+              Arrastrá o hacé click para subir
+            </span>
+            <img id="preview-img" style="display:none;max-width:100%;max-height:160px;margin-top:12px;object-fit:contain;">
+          </div>
+        </div>
+
+        <!-- Status -->
+        <div id="form-status" style="font-family:'DM Mono',monospace;font-size:0.62rem;letter-spacing:0.1em;margin-bottom:16px;min-height:18px;"></div>
+
+        <button class="btn" onclick="enviarOperacion()"><span>Registrar → n8n</span></button>
+      </div>
+    </div>
+
+    <!-- FINANZAS -->
+    <div class="page" id="page-finanzas">
+      <div class="page-header">
+        <span class="page-label">Moat</span>
+        <h1 class="page-title">Finanzas Personales</h1>
+        <p class="page-desc">Control de ingresos, gastos y presupuesto.</p>
+      </div>
+      <div class="empty-state">
+        <div class="empty-line"></div>
+        <span class="empty-text">Próximamente</span>
+        <div class="empty-line"></div>
+      </div>
+    </div>
+
+    <!-- GYM -->
+    <div class="page" id="page-gym">
+      <div class="page-header">
+        <span class="page-label">Moat</span>
+        <h1 class="page-title">Rutina de Gym</h1>
+        <p class="page-desc">Tu entrenamiento de hoy.</p>
+      </div>
+      <div class="empty-state">
+        <div class="empty-line"></div>
+        <span class="empty-text">Sin rutina configurada</span>
+        <div class="empty-line"></div>
+      </div>
+    </div>
+
+    <!-- HORARIO -->
+    <div class="page" id="page-horario">
+      <div class="page-header">
+        <span class="page-label">Moat</span>
+        <h1 class="page-title">Horario del TEC</h1>
+        <p class="page-desc">Tus clases de la semana.</p>
+      </div>
+      <div class="empty-state">
+        <div class="empty-line"></div>
+        <span class="empty-text">Sin horario configurado</span>
+        <div class="empty-line"></div>
+      </div>
+    </div>
+
+    <!-- TASKS -->
+    <div class="page" id="page-tasks">
+      <div class="page-header">
+        <span class="page-label">Moat</span>
+        <h1 class="page-title">Tasks</h1>
+        <p class="page-desc">Cosas por hacer.</p>
+      </div>
+      <div class="empty-state">
+        <div class="empty-line"></div>
+        <span class="empty-text">Sin tareas pendientes</span>
+        <div class="empty-line"></div>
+      </div>
+    </div>
+
+    <!-- CONTRASEÑAS -->
+    <div class="page" id="page-passwords">
+      <div class="page-header">
+        <span class="page-label">Moat</span>
+        <h1 class="page-title">Contraseñas</h1>
+        <p class="page-desc">Acceso seguro a tus credenciales.</p>
+      </div>
+      <div class="empty-state">
+        <div class="empty-line"></div>
+        <span class="empty-text">Próximamente</span>
+        <div class="empty-line"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // ─── PASSWORD ─────────────────────────────────────────────────────
+  const PASSWORD = 'moat2025'; // ← cambiá esto
+
+  function unlock() {
+    const val = document.getElementById('pwd-input').value;
+    const err = document.getElementById('lock-err');
+    if (val === PASSWORD) {
+      document.getElementById('lock').classList.add('unlocking');
+      setTimeout(() => {
+        document.getElementById('lock').style.display = 'none';
+        document.getElementById('app').classList.add('visible');
+      }, 600);
+    } else {
+      err.classList.add('visible');
+      document.getElementById('pwd-input').value = '';
+      setTimeout(() => err.classList.remove('visible'), 2000);
+    }
+  }
+
+  function lockApp() {
+    document.getElementById('pwd-input').value = '';
+    document.getElementById('lock').style.display = 'flex';
+    document.getElementById('lock').style.opacity = '1';
+    document.getElementById('lock').style.transform = 'none';
+    document.getElementById('lock').classList.remove('unlocking');
+    document.getElementById('app').classList.remove('visible');
+  }
+
+  // ─── NAVIGATION ───────────────────────────────────────────────────
+  let activeNavItem = document.querySelector('.nav-item.active');
+
+  function navigate(pageId, navBtn, parentToggleId) {
+    // Hide all pages
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.getElementById('page-' + pageId).classList.add('active');
+
+    // Update nav active state
+    document.querySelectorAll('.nav-item, .nav-sub-item').forEach(b => b.classList.remove('active'));
+    if (navBtn) navBtn.classList.add('active');
+
+    // Keep parent open if sub-item
+    if (parentToggleId) {
+      document.getElementById(parentToggleId).classList.add('open');
+    }
+  }
+
+  function toggleSub(id, btn) {
+    const sub = document.getElementById('sub-' + id);
+    const isOpen = sub.classList.contains('open');
+    // Close all subs
+    document.querySelectorAll('.nav-sub').forEach(s => s.classList.remove('open'));
+    document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('open'));
+    if (!isOpen) {
+      sub.classList.add('open');
+      btn.classList.add('open');
+    }
+  }
+
+  // ─── CLOCK ────────────────────────────────────────────────────────
+  const DAYS = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    document.getElementById('clock-time').textContent = `${h}:${m}:${s}`;
+    const day = DAYS[now.getDay()];
+    const date = now.getDate();
+    const month = MONTHS[now.getMonth()];
+    document.getElementById('clock-date').textContent = `${day} ${date} ${month}`;
+  }
+
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // ─── WEBHOOK ──────────────────────────────────────────────────────
+  const WEBHOOK_URL = 'https://TU-N8N.app.n8n.cloud/webhook/bolsa'; // ← cambiá esto
+
+  let comprobanteBase64 = null;
+
+  function handleFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      comprobanteBase64 = e.target.result;
+      document.getElementById('preview-img').src = comprobanteBase64;
+      document.getElementById('preview-img').style.display = 'block';
+      document.getElementById('drop-label').textContent = file.name;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleDrop(e) {
+    e.preventDefault();
+    document.getElementById('drop-zone').style.borderColor = 'var(--border2)';
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) handleFile(file);
+  }
+
+  async function enviarOperacion() {
+    const ticker  = document.getElementById('f-ticker').value.trim().toUpperCase();
+    const precio  = parseFloat(document.getElementById('f-precio').value);
+    const monto   = parseFloat(document.getElementById('f-monto').value);
+    const objetivo= parseFloat(document.getElementById('f-objetivo').value);
+    const sector  = document.getElementById('f-sector').value;
+    const status  = document.getElementById('form-status');
+
+    if (!ticker || !precio || !monto || !objetivo || !sector) {
+      status.style.color = '#888';
+      status.textContent = 'Completá todos los campos.';
+      return;
+    }
+
+    const payload = {
+      ticker,
+      precio_compra:    precio,
+      monto_invertido:  monto,
+      precio_objetivo:  objetivo,
+      sector,
+      fecha: new Date().toISOString(),
+      comprobante: comprobanteBase64 || null
+    };
+
+    status.style.color = 'var(--dim)';
+    status.textContent = 'Enviando...';
+
+    try {
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        status.style.color = '#4ade80';
+        status.textContent = '✓ Operación enviada a n8n';
+        // Reset
+        ['f-ticker','f-precio','f-monto','f-objetivo'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('f-sector').value = '';
+        document.getElementById('preview-img').style.display = 'none';
+        document.getElementById('drop-label').textContent = 'Arrastrá o hacé click para subir';
+        comprobanteBase64 = null;
+      } else {
+        throw new Error('Error ' + res.status);
+      }
+    } catch (err) {
+      status.style.color = '#f87171';
+      status.textContent = 'Error al conectar con n8n. Revisá el webhook URL.';
+    }
+  }
+</script>
+
+</body>
+</html>
